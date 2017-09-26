@@ -86,7 +86,7 @@ class DaskMetaStoreWrapper(object):
     def table_to_dask(
             self,
             tablename,              # type: str
-            columns=None,           # type: Optional[List[str]]
+            column_subset=None,     # type: Optional[List[str]]
             database=None,          # type: Optional[str]
             partition_filter=None,  # type: Optional[str]
             **kwargs
@@ -95,7 +95,7 @@ class DaskMetaStoreWrapper(object):
         """
 
         :param tablename:           Name of the hive table to load
-        :param columns:             Column names to load, optional
+        :param column_subset:             Column names to load, optional
         :param database:            Database (schema) that the table is in
         :param partition_filter:    For partitioned tables specify a filter that partitions must adhere to as a string
         :param kwargs:              Other arguments that are passed down to the underlying loaders
@@ -105,6 +105,7 @@ class DaskMetaStoreWrapper(object):
         sd = info.sd                                # type: StorageDescriptor
         serde_info = sd.serdeInfo                   # type: SerDeInfo
         partition_keys = info.partitionKeys         # type: List[FieldSchema]
+        table_params = info.parameters
 
         if len(info.partitionKeys):
             partitions = self._get_partitions(database, partition_filter, tablename)
@@ -117,7 +118,8 @@ class DaskMetaStoreWrapper(object):
                     location=sd.location,
                     serde_info=sd.serdeInfo,
                     metastore_columns=sd.cols,
-                    table_params=sd.parameters,
+                    table_params=table_params,
+                    column_subset=column_subset,
                     kwargs=kwargs
                 )
                 # TODO: convert the dtypes of the fields to the correct one.
@@ -129,9 +131,10 @@ class DaskMetaStoreWrapper(object):
         else:
             return self._hive_metastore_data_to_dask(
                 location=sd.location,
-                serde_info=serde_info,
+                serde_info=sd.serdeInfo,
                 metastore_columns=sd.cols,
                 table_params=sd.parameters,
+                column_subset=table_params,
                 kwargs=kwargs
             )
 
