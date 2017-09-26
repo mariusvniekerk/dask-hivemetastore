@@ -16,7 +16,7 @@ from dask_hivemetastore._gen.hive_metastore.ttypes import (
     Partition,
     StorageDescriptor,
     FieldSchema,
-    SerDeInfo
+    SerDeInfo,
 )
 
 
