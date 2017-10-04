@@ -8,7 +8,7 @@ services:
 before_install:
   - docker pull fpin/docker-hive-spark
   - mkdir data
-  - docker run --rm -e USER=`id -u -n` -e USER_ID=`id -u` -it -v `pwd`/data:/data/hive -p 127.0.0.1:9083:9083 -p 127.0.0.1:10000:10000 fpin/docker-hive-spark
+  - docker run -d --rm -e USER=`id -u -n` -e USER_ID=`id -u` -v `pwd`/data:/data/hive -p 9083:9083 -p 10000:10000 --entrypoint /start.sh fpin/docker-hive-spark
   # install conda and other deps
   - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
