@@ -74,7 +74,7 @@ def test_csv(hive, client):
 
         target = pd.DataFrame(data={'a': [1, 2], 'b': ['1', '2']}, columns=['a', 'b'])
         # validate that these are the same
-        assert_frame_equal(pd_df.set_index('a'), target.set_index('a'), )
+        assert_frame_equal(pd_df.set_index('a').sort_index(), target.set_index('a').sort_index())
 
     finally:
         hive.execute(
