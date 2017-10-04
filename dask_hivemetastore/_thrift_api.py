@@ -47,6 +47,7 @@ def get_transport(socket, host, kerberos_service_name, auth_mechanism='NOSASL',
               'auth_mechanism=%s user=%s password=fuggetaboutit', socket, host,
               kerberos_service_name, auth_mechanism, user)
 
+    auth_mechanism = auth_mechanism or 'NOSASL'
     if auth_mechanism == 'NOSASL':
         return TBufferedTransport(socket)
 

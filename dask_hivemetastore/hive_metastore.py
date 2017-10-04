@@ -4,6 +4,7 @@ import logging as log
 from dask_hivemetastore._thrift_api import (
     get_socket, get_transport, TBinaryProtocol, ThriftClient, Table, StorageDescriptor, SerDeInfo, FieldSchema,
     Partition)
+import numpy as np
 from dask.dataframe import read_csv, read_parquet, read_table, concat, DataFrame
 
 
@@ -52,6 +53,25 @@ def hive_type_to_dtype(hive_typ):
 
     For now we consider only primitive types.
     """
+    types = {
+        'tinyint': np.int8,
+        'smallint': np.int16,
+        'int': np.int32,
+        'bigint': np.int64,
+        'float': np.float32,
+        'double': np.float64,
+        'decimal': np.object,
+        'timestamp': np.datetime64,
+        'date': np.datetime64,
+        'interval': np.timedelta64,
+        'string': np.object,
+        'varchar': np.object,
+        'char': np.object,
+    }
+
+    return types[hive_typ]
+
+
     raise NotImplementedError
 
 
@@ -82,6 +102,10 @@ class DaskMetaStoreWrapper(object):
         else:
             partitions = self.service.get_partitions(database, tablename, max_parts=-1)
         return partitions
+
+    def _remap_path(self, url):
+        """Utility to remap a url emitted from hive to one understood by dask"""
+        return url
 
     def table_to_dask(
             self,
@@ -134,7 +158,7 @@ class DaskMetaStoreWrapper(object):
                 serde_info=sd.serdeInfo,
                 metastore_columns=sd.cols,
                 table_params=sd.parameters,
-                column_subset=table_params,
+                column_subset=column_subset,
                 kwargs=kwargs
             )
 
@@ -156,9 +180,9 @@ class DaskMetaStoreWrapper(object):
             return self._delimited_table_to_dask(
                 location=location,
                 serde_info=serde_info,
-                columns=metastore_columns,
-                table_properties=table_params,
-                selected_columns=column_subset,
+                metastore_columns=metastore_columns,
+                table_params=table_params,
+                column_subset=column_subset,
                 kwargs=kwargs
             )
 
@@ -169,7 +193,7 @@ class DaskMetaStoreWrapper(object):
             kwargs,                 # type: Dict[str, Any]
         ):
         # type: (...) -> DataFrame
-        return read_parquet(location, columns=column_subset, **kwargs)
+        return read_parquet(self._remap_path(location), columns=column_subset, **kwargs)
 
     def _delimited_table_to_dask(
             self,
@@ -196,12 +220,14 @@ class DaskMetaStoreWrapper(object):
             raise ValueError("Unexpected serde: {}".format(serde_info.serializationLib))
 
         kwargs.update(csv_args)
-        skip_header_lines = int(table_params.get("skip.header.line.count", 0))
+        header = int(table_params.get("skip.header.line.count", 0)) - 1
+        if header < 0:
+            header = None
         dd = read_csv(
-            location,
+            self._remap_path(location),
             names=[c.name for c in metastore_columns],
-            dtype={c.name: hive_type_to_dtype(c) for c in metastore_columns},
-            header=skip_header_lines,
+            dtype={c.name: hive_type_to_dtype(c.type) for c in metastore_columns},
+            header=header,
             **kwargs)
         if column_subset is not None:
             return dd[column_subset]
@@ -210,7 +236,7 @@ class DaskMetaStoreWrapper(object):
 
 
 def connect(host, port=9083, timeout=None, use_ssl=False, ca_cert=None, user=None, password=None,
-            kerberos_service_name='hive_metastore', auth_mechanism=None):
+            kerberos_service_name='hive_metastore', auth_mechanism=None, ifclass=DaskMetaStoreWrapper):
     """Connect to a Hive metastore and return a dask compatibility wrapper.
 
     """
@@ -225,4 +251,4 @@ def connect(host, port=9083, timeout=None, use_ssl=False, ca_cert=None, user=Non
     protocol = TBinaryProtocol(transport)
     service = ThriftClient(protocol)
     log.debug('sock=%s transport=%s protocol=%s service=%s', sock, transport, protocol, service)
-    return DaskMetaStoreWrapper(service)
+    return ifclass(service)
