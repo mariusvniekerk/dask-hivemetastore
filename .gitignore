@@ -43,3 +43,5 @@ output/
 # Metastore files from tests
 data/
 
+# pytest
+.cache

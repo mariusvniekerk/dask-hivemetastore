@@ -8,15 +8,17 @@ services:
 before_install:
   - docker pull fpin/docker-hive-spark
   - mkdir data
-  - docker run -d --rm -e USER=`id -u -n` -e USER_ID=`id -u` -v `pwd`/data:/data/hive -p 9083:9083 -p 10000:10000 --entrypoint /start.sh fpin/docker-hive-spark
   # install conda and other deps
   - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda3/bin:$PATH
+  # activate the environment
+  - source /home/travis/miniconda3/bin/activate
 
 install:
-  - conda install --yes -c conda-forge distributed pytest pyhive sasl thrift_sasl pandas
+  - conda install --yes -c conda-forge distributed pytest sasl thrift_sasl pandas python-snappy fastparquet pyarrow
+  - pip install dockerctx pyhive
 
 script:
-  - pytest -vrsx .
+  - source /home/travis/miniconda3/bin/activate
+  - pytest -vrsx -s .

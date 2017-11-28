@@ -68,11 +68,7 @@ def hive_type_to_dtype(hive_typ):
         'varchar': np.object,
         'char': np.object,
     }
-
     return types[hive_typ]
-
-
-    raise NotImplementedError
 
 
 class DaskMetaStoreWrapper(object):
@@ -86,6 +82,11 @@ class DaskMetaStoreWrapper(object):
     def __init__(self, service):
         # type: (ThriftClient) -> None
         self.service = service
+
+    def status(self):
+        from dask_hivemetastore._gen.fb303.ttypes import fb_status
+        status = self.service.getStatus()
+        return fb_status._VALUES_TO_NAMES[status]
 
     def _get_table_info(self, tablename, database=None):
         # type: (str, Optional[str]) -> Table
@@ -103,9 +104,9 @@ class DaskMetaStoreWrapper(object):
             partitions = self.service.get_partitions(database, tablename, max_parts=-1)
         return partitions
 
-    def _remap_path(self, url):
+    def _remap_path(self, url, extension=''):
         """Utility to remap a url emitted from hive to one understood by dask"""
-        return url
+        return f'{url}/*{extension}'
 
     def table_to_dask(
             self,
@@ -193,7 +194,7 @@ class DaskMetaStoreWrapper(object):
             kwargs,                 # type: Dict[str, Any]
         ):
         # type: (...) -> DataFrame
-        return read_parquet(self._remap_path(location), columns=column_subset, **kwargs)
+        return read_parquet(self._remap_path(location, extension='.parquet'), columns=column_subset, **kwargs)
 
     def _delimited_table_to_dask(
             self,
@@ -224,6 +225,7 @@ class DaskMetaStoreWrapper(object):
         if header < 0:
             header = None
         dd = read_csv(
+            # TODO: Use the filesystem to see what the extensions are
             self._remap_path(location),
             names=[c.name for c in metastore_columns],
             dtype={c.name: hive_type_to_dtype(c.type) for c in metastore_columns},
